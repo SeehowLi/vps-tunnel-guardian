@@ -1,0 +1,8 @@
+{
+  "SshUser": "your-user",
+  "SshServer": "ssh.example.com",
+  "LocalPort": 1081,
+  "TargetHost": "target.example.com",
+  "TargetPort": 443,
+  "RetrySeconds": 5
+}

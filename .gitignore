@@ -1,0 +1,12 @@
+# Generated release artifacts
+release/
+build/
+
+# Local development files
+*.tmp
+*.user
+*.pdb
+.vs/
+
+# Never commit a separate real-world configuration file.
+settings.local.json

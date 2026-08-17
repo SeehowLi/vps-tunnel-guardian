@@ -1,0 +1,11 @@
+VPS Tunnel Guardian - Third-Party Notices
+
+Logo: "route-2" from Tabler Icons
+Source: https://commons.wikimedia.org/wiki/File:Tabler-icons_route-2.svg
+Copyright (c) 2020-2026 Paweł Kuna
+License: MIT
+
+The in-window mark is rendered with vector drawing primitives derived from the
+above icon. The application icon uses a high-resolution local ICO rendering.
+The full license is available at:
+https://github.com/tabler/tabler-icons/blob/master/LICENSE
