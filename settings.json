@@ -1,8 +1,5 @@
 {
-  "SshUser": "your-user",
-  "SshServer": "ssh.example.com",
-  "LocalPort": 1081,
-  "TargetHost": "target.example.com",
-  "TargetPort": 443,
-  "RetrySeconds": 5
+  "Version": 2,
+  "MigratedLegacy": false,
+  "Tunnels": []
 }

@@ -1,101 +1,77 @@
-# VPS Tunnel Guardian — 项目交接 README
+# VPS Tunnel Guardian 2.1
 
-## 1. 项目目的
+Windows 桌面 SSH 隧道守护工具：多配置、批量启停、自动重连、暗色界面、关闭到托盘。
 
-这是一个 Windows 桌面端 OpenSSH 本地端口转发守护工具。它替代手动在 PowerShell 中长期运行 `ssh -L ... -N` 的方式：用户在图形界面配置连接，点击启动后，程序负责保活、检测 SSH 会话退出并按配置自动重连。
+[下载 Windows EXE](https://github.com/SeehowLi/vps-tunnel-guardian/releases/latest)
 
-程序采用深色、高 DPI 界面；关闭主窗口时不会停止隧道，而是隐藏到系统托盘。仅在托盘菜单中选择“退出应用”时才会停止隧道并结束程序。
+## 支持的连接方式
 
-## 2. 当前交付状态
+- **本地转发（`-L`）**：本机端口 → SSH 服务器 → 指定目标主机/端口。适合通过 SSH 转发上游 SOCKS 服务，保留该上游作为最终出口。上游代理凭据需在使用它的代理客户端中配置。
+- **SOCKS5（`-D`）**：本机 SOCKS5 端口 → SSH 服务器出网。浏览器代理地址为 `127.0.0.1`，端口为条目设置值。本机 SOCKS5 不要求用户名/密码；应用中的 SSH 密码用于登录 SSH 服务器。
 
-- 图形界面支持启动、停止、连接状态、运行日志和连接参数配置。
-- 可配置 SSH 用户名/服务器、本地监听端口、目标主机/端口和重连间隔。
-- SSH 参数固定包含 `BatchMode=yes`、15 秒连接超时、`ExitOnForwardFailure=yes`、30 秒保活和 3 次保活失败退出。
-- 主窗口关闭后转入系统托盘；双击托盘图标或选择“显示窗口”可恢复。
-- 使用原生 WinForms、Windows OpenSSH 和 .NET Framework；不依赖第三方运行时或后台服务。
-- 提供源码启动、静态检查和 EXE 构建入口。
+两种模式分别配置，程序不会擅自把 `-L` 改成 `-D`，也不会修改 Clash、系统代理、DNS 或系统路由。SSH 隧道仅承载 TCP，不提供 UDP 转发。
 
-## 3. 仓库目录与职责
+## 2.1 更新
+
+- 每条隧道独立启停和重连；主窗口/托盘支持全部启动、全部停止，重复启动会跳过已经运行的条目。
+- 启动后核对本地监听端口归属，确认由该 SSH 进程监听才显示就绪。
+- 端口被占用时继续等待释放，不会终止其他进程。
+- 从配置的重试间隔开始指数退避，默认最高约 60 秒，加不足一秒的随机错峰；稳定 120 秒后重置。原设定超过 60 秒时尊重原值。
+- 认证失败、服务器主机密钥变化时暂停对应条目，修复后手动启动。
+- SSH 参数使用 `Compression=no`、`IPQoS=none`、`TCPKeepAlive=yes`、15 秒连接超时、15 秒保活/6 次失败退出，保留 `ExitOnForwardFailure=yes`。
+- C# 异步读取 SSH 错误，队列有上限；日志自动轮换。原生 TCP 表查询代替频繁 WMI 查询，窗口隐藏时跳过列表重绘。
+- 深色表头、状态汇总、重试次数、错误悬停提示、双击编辑、复制代理地址、新建时选择空闲端口。
+- 修复配置弹窗 Point 构造异常及 askpass 参数处理；原子保存配置，异常配置保留原文件。
+- 新启动器检查已有实例，避免重复启动和覆盖正在使用的运行文件。
+
+这些措施有助于故障恢复和减少额外开销，但不能保证网络永不中断，也不能让已经断开的 TCP 会话无损续传。显示“就绪”不代表所有目标网站均可访问。
+
+## 运行
+
+从 Releases 下载 EXE 后双击，创建配置并启动。运行环境为 Windows、Windows PowerShell 5.1、Windows OpenSSH Client 和 .NET Framework 4.8。EXE 未进行代码签名。
+
+运行数据保存在 `%LOCALAPPDATA%\VpsTunnelGuardianMulti`。首次运行可只读导入 V1 目录 `%LOCALAPPDATA%\VpsTunnelGuardian` 中的旧配置，但不会自动启动或接管其连接。
+
+更新时需要先在旧版托盘选择“退出应用”，再打开新版并启动所需条目；切换期间会短暂断网。原配置与加密凭据保留。点击窗口 × 仅隐藏到托盘，真正退出才停止该实例管理的隧道。
+
+## 构建与测试
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-Release.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Test-VPS-Tunnel-Guardian.ps1
+powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -File .\Test-Stability.ps1
+```
+
+构建生成 `release\VPS-Tunnel-Guardian-v2.1.exe`，并同步更新常用文件名 `release\VPS-Tunnel-Guardian-v2.exe`。二进制通过 GitHub Releases 分发，不提交到 Git 历史。
+
+也可以双击 `Start-VPS-Tunnel-Guardian.cmd`：缺少 EXE 时先构建，再启动。直接运行主 PowerShell 脚本前必须构建辅助 DLL；不要用 `-WindowStyle Hidden` 隐藏整个 GUI。
+
+静态测试检查语法和关键参数；功能测试使用临时本地假 SSH 进程，覆盖批量启停幂等、就绪归属、独立重连、端口冲突恢复、退避上限、DPAPI askpass、原子保存和新增/编辑保存事件。测试不连接真实 VPS、不读取生产密码，并清理临时凭据和进程。
+
+`Test-UI.ps1` 使用虚构配置预览界面，不启动 SSH、不读取生产设置。测试不能替代真实网络环境中的长期稳定性验证。
+
+## 源码交接
 
 | 文件 | 职责 |
 | --- | --- |
-| `VPS-Tunnel-Guardian.ps1` | 主 WinForms 应用、SSH 生命周期、配置校验、托盘行为和深色 UI。 |
-| `Launcher.cs` | EXE 启动器：释放嵌入资源到 `%LOCALAPPDATA%\VpsTunnelGuardian`，再启动 GUI。 |
-| `Build-Release.ps1` | 使用系统 C# 编译器生成 `release\VPS-Tunnel-Guardian.exe`。 |
-| `Test-VPS-Tunnel-Guardian.ps1` | 无网络、无隧道的语法和关键安全参数静态检查。 |
-| `settings.json` | 可公开的示例配置；不是任何真实环境配置。 |
-| `Start-VPS-Tunnel-Guardian.cmd` | 从源码直接启动 GUI 的便捷入口。 |
-| `tunnel-logo.ico` | EXE、窗口和托盘使用的 Windows 图标。 |
-| `THIRD_PARTY_NOTICES.txt` | 图标来源与许可说明。 |
+| `VPS-Tunnel-Guardian.ps1` | WinForms、多配置、生命周期、重连、持久化、托盘。 |
+| `GuardianRuntime.cs` | 原生 TCP 表查询、线程安全的 SSH 错误队列、深色按钮。 |
+| `SshAskPass.cs` | 当前 Windows 用户 DPAPI 解密，响应 SSH 密码提示。 |
+| `Launcher.cs` | 实例检查、资源释放、无控制台 GUI 启动。 |
+| `Build-Release.ps1` | 编译辅助 DLL/EXE 并嵌入单文件启动器。 |
+| `Test-Stability.ps1` / `Test-FakeSsh.cs` | 无外网的功能回归。 |
+| `settings.json` | 空的公开示例配置。 |
+| `THIRD_PARTY_NOTICES.txt` | 图标来源与许可。 |
 
-`release/` 是本地生成目录，已被 Git 忽略；不应提交二进制构建产物。
+修改 `.ps1` 时保留 UTF-8 BOM，以兼容 Windows PowerShell 5.1。维护时先构建和运行回归，再在独立环境验证 UI；不要为了测试而停止用户的现有 SSH。
 
-## 4. 运行方式
+## 密码、日志与发布边界
 
-### 从源码运行
+- 密码模式使用 DPAPI CurrentUser 加密，保存于运行目录 `credentials\<id>.bin`；配置 JSON 与 SSH 命令行中没有明文密码。文件路径仅经 SSH 子进程环境变量传给 askpass。
+- 加密数据仍是敏感凭据；同一 Windows 用户下的程序可能解密，不能把它当作抵抗本机恶意软件的保险箱。
+- 不启用密码模式时交给本机 OpenSSH 的既有密钥/代理配置，使用 `BatchMode=yes`。
+- 首次连接采用 `StrictHostKeyChecking=accept-new`；这是首次信任机制，不是预先核验服务器身份。后续密钥变化会拒绝连接。
+- 运行目录 `guardian.log` 和 `guardian.log.1` 各约 512 KiB，可能包含服务器地址及错误，不应公开上传。
+- 仓库和 Release 仅包含源码、图标和空配置；不包含真实节点地址、上游凭据、Clash 配置、私钥或运行日志。
 
-双击 `Start-VPS-Tunnel-Guardian.cmd`，或在仓库根目录运行：
-
-```powershell
-powershell.exe -NoLogo -NoProfile -Sta -ExecutionPolicy Bypass -File .\VPS-Tunnel-Guardian.ps1
-```
-
-在应用内选择“配置”，填写你自己的 SSH 服务器与端口转发目标，保存后点击“启动隧道”。
-
-### 构建 EXE
-
-需要 Windows PowerShell 5.1、Windows OpenSSH Client 和 .NET Framework C# 编译器：
-
-```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Build-Release.ps1
-```
-
-输出文件为：
-
-```text
-release\VPS-Tunnel-Guardian.exe
-```
-
-EXE 首次运行会将脚本、图标和示例配置释放到：
-
-```text
-%LOCALAPPDATA%\VpsTunnelGuardian
-```
-
-真实运行配置也保存在该目录，因此更新 EXE 不会覆盖用户已保存的配置。
-
-## 5. 配置和安全边界
-
-- `settings.json` 只使用 `ssh.example.com` 与 `target.example.com` 等示例值。
-- 不要将真实服务器地址、内部目标地址、私钥、密码、SSH 配置或 `%LOCALAPPDATA%\VpsTunnelGuardian\settings.json` 提交到仓库。
-- 程序不保存密码，不处理私钥；认证完全交给本机 Windows OpenSSH 客户端及其已有的密钥/代理配置。
-- `BatchMode=yes` 使认证失败立即返回，避免 GUI 在后台等待密码输入。
-- `ExitOnForwardFailure=yes` 可在本地端口不能绑定时退出并按重试策略处理。
-
-## 6. 验证与维护
-
-提交前至少运行：
-
-```powershell
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File .\Test-VPS-Tunnel-Guardian.ps1
-```
-
-预期输出以 `PASS:` 开头。该检查不会连接 SSH 服务器，也不会启动隧道。
-
-修改主程序后，依次执行静态检查、`Build-Release.ps1`，再在未启动隧道的情况下打开 EXE，确认：
-
-1. GUI 可正常打开并显示深色标题栏、窗口图标和托盘图标。
-2. 点击标题栏 `×` 后窗口隐藏而进程保持运行。
-3. 托盘菜单可恢复窗口和完全退出应用。
-4. 配置弹窗拒绝非法端口与包含空格/注入字符的主机名。
-
-## 7. 已知限制
-
-- 工具监控的是 SSH 隧道进程。远端目标服务在没有客户端访问时不可用，不一定会立即导致 SSH 进程退出。
-- 目前仅针对 Windows 和系统自带 `ssh.exe` 设计；未提供 macOS/Linux 版本。
-- Windows Shell 使用 `.ico` 作为应用图标格式；窗口中的路由标记则由抗锯齿矢量图元实时绘制，文字使用原生 TrueType/OpenType 字体并启用 DPI 自适应。
-- 若 Windows 显示 SmartScreen 提示，通常是因为本地构建的 EXE 未使用代码签名证书；如需面向广泛用户分发，应在发布流程中加入代码签名。
-
-## 8. 第三方许可
-
-路由图标基于 MIT 许可的 Tabler Icons。详情见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+图标基于 MIT 许可的 Tabler Icons，详见 [第三方许可](THIRD_PARTY_NOTICES.txt)。

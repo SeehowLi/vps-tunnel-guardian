@@ -10,3 +10,13 @@ build/
 
 # Never commit a separate real-world configuration file.
 settings.local.json
+
+# Local runtime data and authentication material
+credentials/
+guardian.log*
+*-qa.png
+*.pem
+*.key
+*.bin
+SshAskPass.exe
+GuardianRuntime.dll
